@@ -6,6 +6,7 @@ import cv2 as cv
 import visao
 import time
 import numpy as np
+import os
 
 class AboutWindow(tk.Frame): # aqui teremos os widgets da tela
     def __init__(self, master=None): 
@@ -94,12 +95,19 @@ class MainWindow(tk.Frame): # aqui teremos os widgets da tela
         self.quit.grid(column=1, row=6, sticky='S', padx=1, pady=1)
         self.quit.focus_force()
 
+        self.desliga = rr.Button(self.master, text="Desligar", command=self.turnoff)
+        self.desliga.grid(column=1, row=7, sticky='S', padx=1, pady=1)
+        
         self.framesCount = rr.Label(self.master, text='')
-        self.framesCount.grid(column=1, row=7)
+        self.framesCount.grid(column=1, row=8)
 
         self.lbautores = rr.Label(self.master)
         self.lbautores["text"] = "Autores: Ricardo Antonello, Arildo Valmorbida Junior, Julia Valmorbida e Juliana Valmorbida."
-        self.lbautores.grid(column=2, row=7, sticky='e', padx=2, pady=2, columnspan=2)
+        self.lbautores.grid(column=2, row=8, sticky='e', padx=2, pady=2, columnspan=2)
+
+    def turnoff(self):
+        print('Desligando o sistema...')
+        os.system('systemctl poweroff')
 
     def openAbout(self):
         #aboutWindow = AboutWindow(master=tk.Tk()) 
