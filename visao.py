@@ -14,6 +14,8 @@ class VideoCamera(object):
           try: 
             cam_id=int(self.config)
             self.video = cv.VideoCapture(cam_id)
+            self.video.set(cv.CAP_PROP_FRAME_HEIGHT, 320)
+            self.video.set(cv.CAP_PROP_FRAME_WIDTH, 240)
             print('>> VideoCamera USB (',cam_id,') acionada!')
           except ValueError:
             print('!! ERRO CAMERA USB')
@@ -56,7 +58,6 @@ AREAS = [  [5,    3,  85,105],
            [209,130, 289,235]]
 
 class Engine:
-    
     def __init__(self):
         self.frame = None
         self.counters = []
@@ -64,32 +65,69 @@ class Engine:
         self.tamanho_media_movel = 3
         self.flag_contagem = []
         self.fgbg = cv.createBackgroundSubtractorMOG2()
+        self.img_clean = None # imagem para calibração (sem os carros)
 
+    def set_img_clean(self, img_clean):
+      self.img_clean = img_clean
 
     def run_frame(self, frame=None):
+        #if self.img_clean == None:
+        #  print('Erro: Nao existe imagem de calibração (img_clean)')
+        #  return
+        
         #se não passar parametro fram então tenta ler o atual de DAO_Cameras
         self.frame = frame
         #self.frame_ant = frame # por enquanto não esta usando frame anterior...
         
-        #Rotaciona imagem
-        rows,cols,channels = frame.shape
-        M = cv2.getRotationMatrix2D((cols/2,rows/2),180,1)
-        frame = cv2.warpAffine(frame,M,(cols,rows))
-        
-        frame=verificaVagas(i, img_clean) #vai em formato RGB
+        frame=verificaVagas(frame, self.img_clean) #vai em formato RGB
 
-        backtorgb = cv.cvtColor(fgmask,cv.COLOR_GRAY2RGB)
-        return backtorgb
+        #backtorgb = cv.cvtColor(fgmask,cv.COLOR_GRAY2RGB)
+        return frame
     
     def config(self, frame=None):
       self.frame = frame
       for (a,b,c,d) in AREAS:
-        frame=cv2.rectangle(frame.copy(),(a,b),(c,d),(0,255,0),2)
+        frame=cv.rectangle(frame.copy(),(a,b),(c,d),(0,255,0),2)
       return frame
 
     def save(self, image_path, frame):
       print(image_path, frame.shape)
       cv.imwrite(image_path, frame)
+
+def flip_vertical(frame):
+  #Rotaciona imagem
+  rows,cols,channels = frame.shape
+  M = cv.getRotationMatrix2D((cols/2,rows/2),180,1)
+  frame = cv.warpAffine(frame,M,(cols,rows))
+  return frame
+
+def texto(img, texto, coord, fonte = cv.FONT_HERSHEY_SIMPLEX, cor=(0,0,255), tamanho=0.5, thickness=2):
+    textSize, baseline = cv.getTextSize(texto, fonte, tamanho, thickness);
+    cor_background = 0
+    if type(cor)==int: # se não for colorida a imagem
+        cor_background=255-cor
+    else:
+        cor_background=(0,255,255)
+    #print(cor_background)
+    cv.rectangle(img, (coord[0], coord[1]-textSize[1]-3), (coord[0]+textSize[0], coord[1]+textSize[1]-baseline), cor_background, -1)
+    #cv.putText(img, texto, coord, fonte, tamanho, cor_background, thickness+1, cv.LINE_AA)
+    cv.putText(img, texto, coord, fonte, tamanho, cor, thickness, cv.LINE_AA)
+    return img
+
+def subtraiArea(i1, i2, x1,y1,x2,y2):
+    iA = cv.cvtColor(i1, cv.COLOR_RGB2GRAY) # Converte para imagem em tons de cinza
+    iB = cv.cvtColor(i2, cv.COLOR_RGB2GRAY) 
+    result = iA[y1:y2,x1:x2] - iB[y1:y2,x1:x2] # realiza a subtração na área informada
+    soma_pixels_das_colunas = [sum(x) for x in zip(*result)] # soma os valores dos pixels das colunas
+    return True if sum(soma_pixels_das_colunas)>800000 else False
+
+def verificaVagas(img,img_clean):
+  for (a,b,c,d) in AREAS:
+    ocupada = subtraiArea(img,img_clean,a,b,c,d)
+    temp = 'Ocupada' if ocupada else 'Livre'
+    texto(img, temp, (a,b+15))
+  return img
+
 
 def retira_bordas(frame, tamanho_borda):
     #tamanho da borda em percentual da imagem

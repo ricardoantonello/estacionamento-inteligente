@@ -55,11 +55,14 @@ class MainWindow(tk.Frame): # aqui teremos os widgets da tela
         fileMenu.add_command(label="Usar câmera", command=lambda:self.openVideo('camera'))
         fileMenu.add_separator()
         fileMenu.add_command(label="Sair", command=root.quit)
+        fileMenu.add_separator()
+        fileMenu.add_command(label="Desligar...", command=self.turnoff)
         menubar.add_cascade(label="Arquivo", menu=fileMenu)
         helpMenu = tk.Menu(menubar, tearoff=0)
         helpMenu.add_command(label="Ajuda", command=self.openAbout)
         helpMenu.add_command(label="Sobre...", command=self.openAbout)
         menubar.add_cascade(label="Ajuda", menu=helpMenu)
+        
         # FIM DA CRIACAO DO MENU
 
         logo = Image.open('ifc_logo.png')
@@ -115,57 +118,27 @@ class MainWindow(tk.Frame): # aqui teremos os widgets da tela
         self.aboutWindow = tk.Toplevel(self.master) 
         self.app = AboutWindow(self.aboutWindow) 
 
-    def calibragem():
-        # Se não tem picamera então captura da webcam
-        vc = cv2.VideoCapture(0)
-        vc.set(cv2.CAP_PROP_FRAME_WIDTH,320)  
-        vc.set(cv2.CAP_PROP_FRAME_HEIGHT,240)
-        if vc.isOpened(): # try to get the first frame
-            is_capturing, frame = vc.read()
-        else:
-            is_capturing = False  
-
-        # calibragem
-        img_clean = 0
-        cont = 0
-        while is_capturing:
-            try: # Lookout for a keyboardInterrupt to stop the script
-                is_capturing, frame = vc.read()   
-                print('Calibrando... Aguarde!')
-                time.sleep(0.2)
-                if cont > 0:
-                    #img_clean = cv2.accumulate(frame, img_clean)
-                    img_clean = frame.copy()
-                else:
-                    img_clean = frame.copy()
-                    cont+=1
-                if cont>2:
-                    break
-                
-            except KeyboardInterrupt:
-                vc.release()
-            except:
-                print('Erro!')
-                vc.release()
-
     def update(self):
         try:
             success, frame = self.vc.get_frame()
             if success:
+                frame = visao.flip_vertical(frame)
+                if self.frameCounter < 10: # nos primeiros 10 frames esta calibrando e atualiza o img_clean
+                    self.engine.set_img_clean(frame.copy())
                 # Aplic filtros para melhorar a imagem
                 frame_eq = visao.filtro_1(frame)
-                frame_1 = self.engine.run_frame(frame)
-                frame_2 = self.engine.config(frame)
+                frame_1 = self.engine.config(frame.copy())
+                frame_2 = self.engine.run_frame(frame.copy())
                 visao.escreve(frame_eq, 'Equalizado')
-                visao.escreve(frame_1, 'Filtro 1')
-                visao.escreve(frame_2, 'Filtro 2')
-                visao.escreve(frame, 'Original')
+                #visao.escreve(frame_1, 'Filtro 1')
+                #visao.escreve(frame_2, 'Filtro 2')
+                visao.escreve(frame, 'Original') 
                 saida = np.vstack([np.hstack([frame, frame_eq]),np.hstack([frame_1, frame_2])])
                 #Converte de OpenCV para formato Tkinter no canvas
-                frame = cv.cvtColor(saida, cv.COLOR_BGR2RGB)
-                frame = ImageTk.PhotoImage(image = Image.fromarray(frame))    
-                self.canvas.photo = frame  # IMPORTANTE: Importante salvar na instancia do canvas em .photo ou qualquer outra propriedade (tipo .xxx) para permitir a exibição
-                self.canvas.itemconfig(self.image_on_canvas, image=frame)
+                saida = cv.cvtColor(saida.copy(), cv.COLOR_BGR2RGB)
+                saida = ImageTk.PhotoImage(image = Image.fromarray(saida.copy()))    
+                self.canvas.photo = saida  # IMPORTANTE: Importante salvar na instancia do canvas em .photo ou qualquer outra propriedade (tipo .xxx) para permitir a exibição
+                self.canvas.itemconfig(self.image_on_canvas, image=saida)
                 self.frameCounter += 1
                 if self.frameCount==0:
                     self.framesCount['text'] = 'Contador de frames: %d' % self.frameCounter
@@ -229,6 +202,7 @@ class MainWindow(tk.Frame): # aqui teremos os widgets da tela
             self.image_on_canvas = self.canvas.create_image(0, 0, anchor=tk.NW)
             # chama método update() para atualizar frames na tela 
             self.isUpdating = True
+            messagebox.showinfo('Atenção!','Esvazie o estacionamento para calibragem inicial.')
             self.update()
         else:
             messagebox.showinfo("Erro acessando fonte de dados!", "Erro acessando fonte de dados: Caso seja um arquivo de vídeo confira se o arquivo não esta corrompido. Caso seja uma câmera, confira se ela esta ligada corretamente ao computador.")            
